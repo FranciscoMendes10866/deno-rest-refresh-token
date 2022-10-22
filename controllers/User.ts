@@ -185,7 +185,6 @@ class UserController {
     await RefreshToken.deleteById(found.id as number)
 
     ctx.response.status = 204
-    ctx.response.body = "Successfully logged out."
   }
 
   public tokenRefresh = async (ctx: Context) => {
@@ -258,7 +257,7 @@ class UserController {
    * Utils
    */
 
-   private setAccessTokenExpiration = (): number => {
+  private setAccessTokenExpiration = (): number => {
     return getNumericDate(dayjs().add(20, "minutes").toDate());
   };
 
