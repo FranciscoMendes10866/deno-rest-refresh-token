@@ -1,6 +1,6 @@
 import { Context, RouterMiddleware } from "https://deno.land/x/oak@v9.0.0/mod.ts";
 import * as bcrypt from "https://deno.land/x/bcrypt/mod.ts";
-import { create, verify } from "https://deno.land/x/djwt/mod.ts";
+import { create, verify, getNumericDate } from "https://deno.land/x/djwt/mod.ts";
 import { nanoid } from "https://deno.land/x/nanoid/mod.ts";
 import dayjs from "https://deno.land/x/deno_dayjs@v0.2.2/mod.ts";
 
@@ -86,6 +86,7 @@ class UserController {
 
     const accessToken = await create({ alg: "HS512", typ: "JWT" }, {
       userId,
+      exp: this.setAccessTokenExpiration()
     }, key);
 
     const refreshToken = this.createRefreshToken();
@@ -227,6 +228,7 @@ class UserController {
 
     const accessToken = await create({ alg: "HS512", typ: "JWT" }, {
       userId,
+      exp: this.setAccessTokenExpiration()
     }, key);
 
     const createdRefreshToken = this.createRefreshToken();
@@ -255,6 +257,10 @@ class UserController {
   /**
    * Utils
    */
+
+   private setAccessTokenExpiration = (): number => {
+    return getNumericDate(dayjs().add(20, "minutes").toDate());
+  };
 
   private createRefreshToken = () => {
     return {

@@ -13,7 +13,7 @@ router.post("/auth/signin", userController.signIn);
 router.get("/auth/token-refresh", userController.tokenRefresh);
 router.use(userController.authGuard);
 router.get("/auth/current-user", userController.currentUser);
-router.get("/auth/logout", userController.signOut);
+router.post("/auth/logout", userController.signOut);
 
 app.use(router.allowedMethods());
 app.use(router.routes());
