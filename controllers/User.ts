@@ -108,10 +108,7 @@ class UserController {
     ctx.response.body = {
       session: {
         accessToken,
-        refreshToken: {
-          token: result.token,
-          expiresAt: result.expiresAt
-        },
+        refreshToken: result.token,
       },
       user: {
         username,
@@ -187,9 +184,72 @@ class UserController {
     await RefreshToken.deleteById(found.id as number)
 
     ctx.response.status = 204
-    ctx.response.body = {
-      message: "Successfully logged out."
+    ctx.response.body = "Successfully logged out."
+  }
+
+  public tokenRefresh = async (ctx: Context) => {
+    const { value } = ctx.request.body({ type: "json" });
+    const { refreshToken } = await value;
+
+    if (!refreshToken) {
+      ctx.response.status = 400;
+      ctx.response.body = {
+        error: "Session is required.",
+      };
+      return;
     }
+
+    const found = await RefreshToken.where("token", refreshToken).first()
+
+    if (!found.token) {
+      ctx.response.status = 401;
+      ctx.response.body = {
+        error: "Session not found.",
+      };
+      return;
+    }
+
+    const isExpired = this.isRefreshTokenExpired(found.expiresAt as number)
+
+    if (isExpired) {
+      await RefreshToken.deleteById(found.id as number)
+
+      ctx.response.status = 500;
+      ctx.response.body = {
+        error: "Session expired.",
+      };
+      return;
+    }
+
+    await RefreshToken.deleteById(found.id as number)
+
+    const userId = found.userId as string
+
+    const accessToken = await create({ alg: "HS512", typ: "JWT" }, {
+      userId,
+    }, key);
+
+    const createdRefreshToken = this.createRefreshToken();
+
+    const newRefreshToken = new RefreshToken()
+    newRefreshToken.token = createdRefreshToken.token
+    newRefreshToken.expiresAt = createdRefreshToken.expiresAt
+    newRefreshToken.userId = userId
+
+    const result = await newRefreshToken.save()
+
+    if (!result.token) {
+      ctx.response.status = 500;
+      ctx.response.body = {
+        error: "Error while creating new session.",
+      };
+      return;
+    }
+
+    ctx.response.body = {
+      accessToken,
+      refreshToken: result.token,
+    };
   }
 
   /**
