@@ -1,6 +1,6 @@
-import { Context } from "https://deno.land/x/oak@v9.0.0/mod.ts";
+import { Context, RouterMiddleware } from "https://deno.land/x/oak@v9.0.0/mod.ts";
 import * as bcrypt from "https://deno.land/x/bcrypt/mod.ts";
-import { create } from "https://deno.land/x/djwt/mod.ts";
+import { create, verify } from "https://deno.land/x/djwt/mod.ts";
 import { nanoid } from "https://deno.land/x/nanoid/mod.ts";
 import dayjs from "https://deno.land/x/deno_dayjs@v0.2.2/mod.ts";
 
@@ -14,7 +14,7 @@ const key = await crypto.subtle.generateKey(
 );
 
 class UserController {
-  public signup = async (ctx: Context) => {
+  public signUp = async (ctx: Context) => {
     const { value } = ctx.request.body({ type: "json" });
     const { username, password } = await value;
 
@@ -47,7 +47,7 @@ class UserController {
     ctx.response.body = { result };
   };
 
-  public signin = async (ctx: Context) => {
+  public signIn = async (ctx: Context) => {
     const { value } = ctx.request.body({ type: "json" });
     const { username, password } = await value;
 
@@ -118,6 +118,79 @@ class UserController {
       },
     };
   };
+
+  public authGuard: RouterMiddleware = async (ctx, next) => {
+    const authorization = ctx.request.headers.get("Authorization")
+
+    if (!authorization) {
+      ctx.response.status = 401;
+      ctx.response.body = {
+        error: "Authorization header is required.",
+      }
+      return
+    }
+
+    const isValid = authorization.startsWith("Bearer ");
+
+    if (!isValid) {
+      ctx.response.status = 401;
+      ctx.response.body = {
+        error: "Invalid authorization header.",
+      }
+      return
+    }
+
+    const token = authorization.replace("Bearer ", "").trim();
+
+    try {
+      const payload = await verify(token, key);
+      ctx.state = { userId: payload.id }
+    } catch {
+      ctx.response.status = 401;
+      ctx.response.body = {
+        error: "Invalid token.",
+      }
+      return
+    }
+
+    await next()
+  }
+
+  public currentUser = async (ctx: Context) => {
+    const userId = ctx.state.userId as string
+    const result = await User.where("id", userId).first()
+    ctx.response.body = { currentUser: result }
+  }
+
+  public signOut = async (ctx: Context) => {
+    const { value } = ctx.request.body({ type: "json" });
+    const { refreshToken } = await value;
+
+    if (!refreshToken) {
+      ctx.response.status = 400;
+      ctx.response.body = {
+        error: "Session is required.",
+      };
+      return;
+    }
+
+    const found = await RefreshToken.where("token", refreshToken).first()
+
+    if (!found.token) {
+      ctx.response.status = 401;
+      ctx.response.body = {
+        error: "Session not found.",
+      };
+      return;
+    }
+
+    await RefreshToken.deleteById(found.id as number)
+
+    ctx.response.status = 204
+    ctx.response.body = {
+      message: "Successfully logged out."
+    }
+  }
 
   /**
    * Utils

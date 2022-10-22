@@ -5,11 +5,14 @@ import { userController } from "./controllers/User.ts";
 
 const port = 3000;
 
-const app = new Application();
+const app = new Application<{ state: { userId: string } }>();
 const router = new Router();
 
-router.post("/auth/signup", userController.signup);
-router.post("/auth/signin", userController.signin);
+router.post("/auth/signup", userController.signUp);
+router.post("/auth/signin", userController.signIn);
+router.use(userController.authGuard);
+router.get("/auth/current-user", userController.currentUser);
+router.get("/auth/logout", userController.signOut);
 
 app.use(router.allowedMethods());
 app.use(router.routes());
